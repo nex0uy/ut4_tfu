@@ -1,0 +1,645 @@
+{
+	"info": {
+		"_postman_id": "nestjs-api-collection",
+		"name": "NestJS E-commerce API",
+		"description": "Colección completa de endpoints para la API de E-commerce",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Verifica el estado de salud de la aplicación y la conexión a la base de datos"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoint de monitoreo de salud de la aplicación"
+		},
+		{
+			"name": "Retry Pattern",
+			"item": [
+				{
+					"name": "Probar Retry - Get Products",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/products",
+							"host": ["{{baseUrl}}"],
+							"path": ["products"]
+						},
+						"description": "El patrón Retry funciona automáticamente en todos los endpoints. Para probarlo: 1) Ejecuta esta petición normalmente, 2) Detén la base de datos con 'docker-compose stop db', 3) Espera 2 segundos y ejecuta esta petición de nuevo (el retry intentará 3 veces), 4) Arranca la base de datos con 'docker-compose start db' dentro de los 3 segundos - la petición debería funcionar"
+					},
+					"response": []
+				}
+			],
+			"description": "El patrón Retry reintenta automáticamente las operaciones que fallan hasta 3 veces. Funciona en todos los endpoints."
+		},
+		{
+			"name": "Publisher/Subscriber Pattern",
+			"item": [
+				{
+					"name": "Probar Publisher/Subscriber - Create Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clientId\": 1,\n  \"productIds\": [1, 2],\n  \"totalAmount\": 97000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"]
+						},
+						"description": "El patrón Publisher/Subscriber publica eventos cuando se crea una orden. Para probarlo: 1) Abre una terminal y ejecuta 'docker-compose logs app -f' para ver los logs, 2) Ejecuta esta petición, 3) Verás en los logs el mensaje 'Nueva orden creada: ID X, Cliente Y, Total: $Z' que confirma que el subscriber escuchó y procesó el evento de forma asíncrona."
+					},
+					"response": []
+				}
+			],
+			"description": "El patrón Publisher/Subscriber desacopla el procesamiento mediante eventos. Cuando se crea una orden, se publica un evento y los subscribers lo procesan asíncronamente."
+		},
+		{
+			"name": "Gatekeeper Pattern",
+			"item": [
+				{
+					"name": "Sin API Key (debe fallar)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products",
+							"host": ["{{baseUrl}}"],
+							"path": ["products"]
+						},
+						"description": "Prueba sin API key. Debe devolver error 401: API key requerida"
+					},
+					"response": []
+				},
+				{
+					"name": "Con API Key incorrecta (debe fallar)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "clave-incorrecta"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/products",
+							"host": ["{{baseUrl}}"],
+							"path": ["products"]
+						},
+						"description": "Prueba con API key incorrecta. Debe devolver error 401: API key inválida"
+					},
+					"response": []
+				},
+				{
+					"name": "Con API Key correcta (debe funcionar)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "secret-key-123"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/products",
+							"host": ["{{baseUrl}}"],
+							"path": ["products"]
+						},
+						"description": "Prueba con API key correcta. Debe funcionar correctamente y devolver los productos"
+					},
+					"response": []
+				},
+				{
+					"name": "Health sin API Key (debe funcionar)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "El endpoint /health está excluido del Gatekeeper, debe funcionar sin API key"
+					},
+					"response": []
+				}
+			],
+			"description": "El patrón Gatekeeper protege todos los endpoints requiriendo una API key válida en el header x-api-key. La API key correcta es 'secret-key-123'. El endpoint /health está excluido."
+		},
+		{
+			"name": "Gateway Offloading Pattern",
+			"item": [
+				{
+					"name": "Probar Rate Limit - 10 peticiones (deben funcionar)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/products",
+							"host": ["{{baseUrl}}"],
+							"path": ["products"]
+						},
+						"description": "El patrón Gateway Offloading limita las peticiones a 10 por minuto por IP. Ejecuta esta petición 10 veces rápidamente: todas deberían funcionar. Luego ejecuta una petición más (la #11) y deberías recibir un error 429: 'Demasiadas peticiones. Intenta de nuevo más tarde.' Esto confirma que el rate limiting está protegiendo la aplicación. Para probar el reset, espera 1 minuto y ejecuta otra petición - debería funcionar de nuevo."
+					},
+					"response": []
+				},
+				{
+					"name": "Probar Rate Limit - Petición #11 (debe fallar)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/products",
+							"host": ["{{baseUrl}}"],
+							"path": ["products"]
+						},
+						"description": "Ejecuta esta petición después de hacer 10 peticiones rápidas. Deberías recibir error 429 confirmando que el rate limit está funcionando."
+					},
+					"response": []
+				},
+				{
+					"name": "Health sin límite (debe funcionar siempre)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "El endpoint /health está excluido del rate limiting, por lo que siempre debería funcionar sin importar cuántas peticiones se hagan."
+					},
+					"response": []
+				}
+			],
+			"description": "El patrón Gateway Offloading limita las peticiones a 10 por minuto por IP para proteger la aplicación de sobrecarga. Después de 10 peticiones, devuelve error 429. El endpoint /health está excluido."
+		},
+		{
+			"name": "Products",
+			"item": [
+				{
+					"name": "Get All Products",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/products",
+							"host": ["{{baseUrl}}"],
+							"path": ["products"]
+						},
+						"description": "Obtiene todos los productos. Este endpoint implementa Cache-Aside: la primera vez consulta la BD y guarda en Redis, las siguientes veces devuelve desde Redis (más rápido). Para probarlo: ejecuta la petición dos veces y compara los tiempos de respuesta, la segunda debería ser más rápida."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Product by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/products/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["products", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID del producto"
+								}
+							]
+						},
+						"description": "Obtiene un producto por su ID. Este endpoint implementa Cache-Aside: la primera vez consulta la BD y guarda en Redis, las siguientes veces devuelve desde Redis (más rápido). Para probarlo: ejecuta la petición dos veces con el mismo ID y compara los tiempos de respuesta."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"iPhone 15 Pro\",\n  \"price\": 1200000,\n  \"description\": \"Teléfono inteligente con pantalla OLED\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products",
+							"host": ["{{baseUrl}}"],
+							"path": ["products"]
+						},
+						"description": "Crea un nuevo producto. Este endpoint invalida el cache (products:all) para que las consultas siguientes obtengan datos frescos desde la BD. Patrón Cache-Aside en acción."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Product",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"price\": 1100000,\n  \"description\": \"Precio actualizado\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["products", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID del producto a actualizar"
+								}
+							]
+						},
+						"description": "Actualiza un producto existente. Este endpoint invalida el cache del producto específico y el cache de todos los productos. Patrón Cache-Aside en acción."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Product",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/products/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["products", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID del producto a eliminar"
+								}
+							]
+						},
+						"description": "Elimina un producto. Este endpoint invalida el cache del producto eliminado y el cache de todos los productos. Patrón Cache-Aside en acción."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gestionar productos. Todos los endpoints implementan Cache-Aside con Redis: las consultas se cachean y se invalidan cuando se modifica información."
+		},
+		{
+			"name": "Clients",
+			"item": [
+				{
+					"name": "Get All Clients",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/clients",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients"]
+						},
+						"description": "Obtiene todos los clientes"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Client by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/clients/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID del cliente"
+								}
+							]
+						},
+						"description": "Obtiene un cliente por su ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Client",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Ana López\",\n  \"email\": \"ana.lopez@email.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/clients",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients"]
+						},
+						"description": "Crea un nuevo cliente"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Client",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"nuevo.email@email.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/clients/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID del cliente a actualizar"
+								}
+							]
+						},
+						"description": "Actualiza un cliente existente"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Client",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/clients/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID del cliente a eliminar"
+								}
+							]
+						},
+						"description": "Elimina un cliente"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gestionar clientes. Todos los endpoints están protegidos por el patrón Gatekeeper."
+		},
+		{
+			"name": "Orders",
+			"item": [
+				{
+					"name": "Get All Orders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"]
+						},
+						"description": "Obtiene todas las órdenes"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID de la orden"
+								}
+							]
+						},
+						"description": "Obtiene una orden por su ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clientId\": 1,\n  \"productIds\": [1, 2],\n  \"totalAmount\": 97000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"]
+						},
+						"description": "Crea una nueva orden. Este endpoint activa el patrón Publisher/Subscriber: cuando se crea la orden, se publica un evento y un subscriber lo procesa de forma asíncrona. Para verificar: 1) Abre otra terminal y ejecuta 'docker-compose logs app -f', 2) Ejecuta esta petición, 3) En los logs verás primero 'Evento publicado: orden creada ID X', luego la respuesta de la API, y después 'Procesando orden creada: ID X' confirmando que el subscriber lo procesó de forma asíncrona."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Order",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"productIds\": [1, 2, 3],\n  \"totalAmount\": 150000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID de la orden a actualizar"
+								}
+							]
+						},
+						"description": "Actualiza una orden existente"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Order",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{apiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "ID de la orden a eliminar"
+								}
+							]
+						},
+						"description": "Elimina una orden"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gestionar órdenes. El endpoint Create Order activa el patrón Publisher/Subscriber publicando eventos de forma asíncrona."
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "apiKey",
+			"value": "secret-key-123",
+			"type": "string"
+		}
+	]
+}
+
